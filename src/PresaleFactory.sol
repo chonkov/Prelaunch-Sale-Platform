@@ -9,12 +9,15 @@ contract PresaleFactory is Ownable {
     enum PresaleStatus {
         NonExistent,
         Started,
-        Ended
+        Ended,
+        Claimable
     }
 
+    // Errors
     error InvalidProtocolFee(uint256 protocolFee);
     error InvalidProtocolFeeAddress(address protocolFeeAddress);
 
+    // Events
     event ProtocolFeeSet(uint256 previousProtocolFee, uint256 newProtocolFee);
     event ProtocolFeeAddressTransferred(address previousProtocolFeeAddress, address newProtocolFeeAddress);
     event PresaleCreated(address indexed presale, address indexed creator);
@@ -35,14 +38,17 @@ contract PresaleFactory is Ownable {
         address _owner,
         PresaleMetadata calldata _presaleMetadata,
         uint256 _initSupply,
-        uint256 _price
+        uint256 _price,
+        uint128 _startDate,
+        uint128 _duration
     ) external {
-        Presale presale = new Presale(_owner, _presaleMetadata, _initSupply, _price);
+        Presale presale = new Presale(_owner, _presaleMetadata, _initSupply, _price, _startDate, _duration);
         presaleStatus[presale] = PresaleStatus.Started;
 
         emit PresaleCreated(address(presale), msg.sender);
     }
 
+    // Admin functions
     function setProtocolFee(uint256 newProtocolFee) external onlyOwner {
         if (newProtocolFee == 0) revert InvalidProtocolFee(0);
 

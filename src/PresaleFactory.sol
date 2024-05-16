@@ -9,8 +9,8 @@ contract PresaleFactory is Ownable {
     enum PresaleStatus {
         NonExistent,
         Started,
-        Ended,
-        Claimable
+        Liquidity,
+        Ended
     }
 
     // Errors
@@ -38,11 +38,11 @@ contract PresaleFactory is Ownable {
         address _owner,
         PresaleMetadata calldata _presaleMetadata,
         uint256 _initSupply,
-        uint256 _price,
-        uint128 _startDate,
+        uint256 _presalePrice,
+        uint128 _startTimestamp,
         uint128 _duration
     ) external {
-        Presale presale = new Presale(_owner, _presaleMetadata, _initSupply, _price, _startDate, _duration);
+        Presale presale = new Presale(_owner, _presaleMetadata, _initSupply, _presalePrice, _startTimestamp, _duration);
         presaleStatus[presale] = PresaleStatus.Started;
 
         emit PresaleCreated(address(presale), msg.sender);

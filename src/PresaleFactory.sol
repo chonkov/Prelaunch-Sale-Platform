@@ -22,13 +22,15 @@ contract PresaleFactory is Ownable {
     event ProtocolFeeAddressTransferred(address previousProtocolFeeAddress, address newProtocolFeeAddress);
     event PresaleCreated(address indexed presale, address indexed creator);
 
-    uint256 public protocolFee;
+    uint32 public protocolFee;
     address public protocolFeeAddress;
 
     mapping(Presale => PresaleStatus) public presaleStatus;
 
     // Constructor
-    constructor(address _owner, uint256 _protocolFee, address _protocolFeeAddress) Ownable(_owner) {
+    constructor(address _owner, uint32 _protocolFee, address _protocolFeeAddress) Ownable(_owner) {
+        if (_protocolFee >= 10_000) revert();
+
         protocolFee = _protocolFee;
         protocolFeeAddress = _protocolFeeAddress;
     }
@@ -39,17 +41,18 @@ contract PresaleFactory is Ownable {
         PresaleMetadata calldata _presaleMetadata,
         uint256 _initSupply,
         uint256 _presalePrice,
-        uint128 _startTimestamp,
-        uint128 _duration
+        uint64 _startTimestamp,
+        uint64 _presaleDuration
     ) external {
-        Presale presale = new Presale(_owner, _presaleMetadata, _initSupply, _presalePrice, _startTimestamp, _duration);
+        Presale presale =
+            new Presale(_owner, _presaleMetadata, _initSupply, _presalePrice, _startTimestamp, _presaleDuration);
         presaleStatus[presale] = PresaleStatus.Started;
 
         emit PresaleCreated(address(presale), msg.sender);
     }
 
     // Admin functions
-    function setProtocolFee(uint256 newProtocolFee) external onlyOwner {
+    function setProtocolFee(uint32 newProtocolFee) external onlyOwner {
         if (newProtocolFee == 0) revert InvalidProtocolFee(0);
 
         emit ProtocolFeeSet(protocolFee, newProtocolFee);

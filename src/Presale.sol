@@ -21,10 +21,16 @@ contract Presale is Ownable, ERC20 {
 
     event PresaleTokensBought(address indexed buyer, uint256 amount, uint256 value);
     event TokensBought(address indexed buyer, uint256 amount, uint256 value);
+    event TokensCLaimed(address indexed claimer, uint256 _amount);
     event InitSupplyIncreased(uint256 amount);
+    event WebsiteURLChanged(bytes websiteURL, bytes newWebsiteURL);
+    event DocsURLChanged(bytes docsURL, bytes newDocsURL);
+    event PresaleInfoURLChanged(bytes presaleInfoURL, bytes newPresaleInfoURL);
 
     uint256 public constant MAX_PRESALE_DURATION = 28 days;
-    uint256 public constant LIQUIDITY_PHASE_DURATION = 14 days;
+    uint256 public constant MAX_LIQUIDITY_PHASE_DURATION = 14 days;
+    uint256 public VESTING_PERIOD = 10 days;
+
     address public constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address public constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
@@ -35,24 +41,28 @@ contract Presale is Ownable, ERC20 {
     bytes public presaleInfoURL;
 
     mapping(address => uint256) public claimableAmounts;
+    mapping(address => uint256) public claimedAmounts;
     uint256 public initSupply;
     uint256 public totalSupplyPresale;
     uint256 public price;
     uint256 public immutable presalePrice;
 
-    uint128 startTimestamp;
-    uint128 endTimestamp;
+    bool public isPoolCreated;
+    bool public isTerminated;
+
+    uint64 public startTimestamp;
+    uint64 public endTimestamp;
 
     constructor(
         address _owner,
         PresaleMetadata memory _presaleMetadata,
         uint256 _initSupply,
         uint256 _presalePrice,
-        uint128 _startTimestamp,
-        uint128 _duration
+        uint64 _startTimestamp,
+        uint64 _presaleDuration
     ) Ownable(_owner) ERC20(_presaleMetadata.name, _presaleMetadata.symbol) {
         if (block.timestamp > _startTimestamp) revert();
-        if (_duration > MAX_PRESALE_DURATION) revert();
+        if (_presaleDuration > MAX_PRESALE_DURATION) revert();
 
         presaleFactory = msg.sender;
 
@@ -62,13 +72,14 @@ contract Presale is Ownable, ERC20 {
 
         initSupply = _initSupply;
         presalePrice = _presalePrice;
+        price = _presalePrice * 2;
 
         startTimestamp = _startTimestamp;
-        endTimestamp = _startTimestamp + _duration;
+        endTimestamp = _startTimestamp + _presaleDuration;
     }
 
-    function endPresale() external {
-        if (initSupply == 0) endTimestamp = uint128(block.timestamp);
+    function endPresalePrematurely() external {
+        if (initSupply == 0) endTimestamp = uint64(block.timestamp);
     }
 
     function buyPresaleToken(uint256 _amount) external payable {
@@ -92,6 +103,24 @@ contract Presale is Ownable, ERC20 {
         emit TokensBought(msg.sender, _amount, msg.value);
     }
 
+    function claimTokens(uint256 _amount) external {
+        if (!isClaimable()) revert();
+
+        uint256 timeElapsed = block.timestamp - (endTimestamp + MAX_LIQUIDITY_PHASE_DURATION);
+        uint256 daysPassed = timeElapsed / 1 days;
+        uint256 claimableAmount =
+            daysPassed * (claimableAmounts[msg.sender] + claimedAmounts[msg.sender]) / VESTING_PERIOD;
+
+        if (_amount > claimableAmount) revert();
+
+        claimableAmounts[msg.sender] -= _amount;
+        claimedAmounts[msg.sender] += _amount;
+
+        _mint(msg.sender, _amount);
+
+        emit TokensCLaimed(msg.sender, _amount);
+    }
+
     function isStarted() public view returns (bool) {
         return block.timestamp >= startTimestamp;
     }
@@ -101,14 +130,19 @@ contract Presale is Ownable, ERC20 {
     }
 
     function isClaimable() public view returns (bool) {
-        return block.timestamp >= endTimestamp + LIQUIDITY_PHASE_DURATION;
+        return block.timestamp >= endTimestamp + MAX_LIQUIDITY_PHASE_DURATION;
     }
 
+    // Admin functions
     function createLiquidityPool() external onlyOwner {
-        uint256 totalSupplyPresale_ = totalSupplyPresale;
-        uint256 totalFundsRaised = totalSupplyPresale_ * presalePrice;
+        if (isEnded() && isPoolCreated || isTerminated) revert();
 
-        uint256 fundsReservedForPlatform = totalFundsRaised * PresaleFactory(presaleFactory).protocolFee();
+        isPoolCreated = true;
+
+        uint256 cachedTotalSupplyPresale = totalSupplyPresale;
+        uint256 totalFundsRaised = cachedTotalSupplyPresale * presalePrice;
+
+        uint256 fundsReservedForPlatform = totalFundsRaised * PresaleFactory(presaleFactory).protocolFee() / 10_000;
         totalFundsRaised -= fundsReservedForPlatform;
 
         address pair = IUniswapV2Factory(UNISWAP_FACTORY_ADDRESS).createPair(WETH_ADDRESS, address(this));
@@ -126,9 +160,27 @@ contract Presale is Ownable, ERC20 {
         if (!success) revert();
     }
 
-    function increaseInitSupply(uint256 _amount) external onlyOwner {
-        initSupply += _amount;
+    function terminatePresale() external onlyOwner {
+        if (isTerminated) revert();
 
-        emit InitSupplyIncreased(_amount);
+        isTerminated = true;
+    }
+
+    function setWebsiteURL(bytes calldata _websiteURL) external onlyOwner {
+        emit WebsiteURLChanged(websiteURL, _websiteURL);
+
+        websiteURL = _websiteURL;
+    }
+
+    function setDocsURL(bytes calldata _docsURL) external onlyOwner {
+        emit DocsURLChanged(docsURL, _docsURL);
+
+        docsURL = _docsURL;
+    }
+
+    function setPresaleInfoURL(bytes calldata _presaleInfoURL) external onlyOwner {
+        emit PresaleInfoURLChanged(presaleInfoURL, _presaleInfoURL);
+
+        presaleInfoURL = _presaleInfoURL;
     }
 }

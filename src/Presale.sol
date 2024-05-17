@@ -6,7 +6,7 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 
 import {IUniswapV2Factory, IUniswapV2Pair} from "./interfaces/IUniswapV2.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
-import {PresaleFactory} from "./PresaleFactory.sol";
+import {PresalePlatform} from "./PresalePlatform.sol";
 
 struct PresaleMetadata {
     string name;
@@ -17,6 +17,7 @@ struct PresaleMetadata {
 }
 
 contract Presale is Ownable, ERC20 {
+    // Errors
     error InvalidETHAmount(uint256 amount);
     error InvalidFunctionParameter();
     error BuyingPresaleTokensDisallowed();
@@ -28,6 +29,7 @@ contract Presale is Ownable, ERC20 {
     error AlreadyTerminated();
     error UnsuccessfulExternalCall();
 
+    // Events
     event PresaleTokensBought(address indexed buyer, uint256 amount, uint256 value);
     event TokensBought(address indexed buyer, uint256 amount, uint256 value);
     event TokensCLaimed(address indexed claimer, uint256 amount);
@@ -47,7 +49,7 @@ contract Presale is Ownable, ERC20 {
     address public constant UNISWAP_FACTORY_ADDRESS = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address public constant WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    address public presaleFactory;
+    PresalePlatform public presalePlatform;
 
     bytes public websiteURL;
     bytes public docsURL;
@@ -57,7 +59,6 @@ contract Presale is Ownable, ERC20 {
     mapping(address => uint256) public claimedAmounts;
     uint256 public initSupply;
     uint256 public totalSupplyPresale;
-    uint256 public price;
     uint256 public immutable presalePrice;
 
     bool public isPoolCreated;
@@ -67,6 +68,7 @@ contract Presale is Ownable, ERC20 {
     uint64 public endTimestamp;
 
     constructor(
+        address _presalePlatform,
         address _owner,
         PresaleMetadata memory _presaleMetadata,
         uint256 _initSupply,
@@ -77,7 +79,7 @@ contract Presale is Ownable, ERC20 {
         if (block.timestamp > _startTimestamp) revert InvalidFunctionParameter();
         if (_presaleDuration > MAX_PRESALE_DURATION) revert InvalidFunctionParameter();
 
-        presaleFactory = msg.sender;
+        presalePlatform = PresalePlatform(_presalePlatform);
 
         websiteURL = _presaleMetadata.websiteURL;
         docsURL = _presaleMetadata.docsURL;
@@ -85,7 +87,6 @@ contract Presale is Ownable, ERC20 {
 
         initSupply = _initSupply;
         presalePrice = _presalePrice;
-        price = _presalePrice * 2;
 
         startTimestamp = _startTimestamp;
         endTimestamp = _startTimestamp + _presaleDuration;
@@ -109,9 +110,9 @@ contract Presale is Ownable, ERC20 {
     }
 
     function buyToken(uint256 _amount) external payable {
-        if (!isClaimable()) revert BuyingTokensDisallowed();
+        if (!isClaimable() || isTerminated) revert BuyingTokensDisallowed();
 
-        if (msg.value != _amount * price) revert InvalidETHAmount(msg.value);
+        if (msg.value != _amount * presalePrice * 2) revert InvalidETHAmount(msg.value);
 
         _mint(msg.sender, _amount);
 
@@ -119,12 +120,12 @@ contract Presale is Ownable, ERC20 {
     }
 
     function claimTokens(uint256 _amount) external {
-        if (!isClaimable()) revert ClaimingTokensDisallowed();
+        if (!isClaimable() || isTerminated) revert ClaimingTokensDisallowed();
 
         uint256 timeElapsed = block.timestamp - (endTimestamp + MAX_LIQUIDITY_PHASE_DURATION);
         uint256 daysPassed = timeElapsed / 1 days;
-        uint256 claimableAmount =
-            daysPassed * (claimableAmounts[msg.sender] + claimedAmounts[msg.sender]) / VESTING_PERIOD;
+        uint256 claimableAmount = daysPassed * (claimableAmounts[msg.sender] + claimedAmounts[msg.sender])
+            / VESTING_PERIOD - claimedAmounts[msg.sender];
 
         if (_amount > claimableAmount) revert InvalidAmount();
 
@@ -137,7 +138,7 @@ contract Presale is Ownable, ERC20 {
     }
 
     function redeem() external {
-        if (!isTerminated) revert();
+        if (!isClaimable() || !isTerminated) revert();
 
         uint256 amount = claimableAmounts[msg.sender];
         uint256 value = amount * presalePrice;
@@ -164,14 +165,13 @@ contract Presale is Ownable, ERC20 {
 
     // Admin functions
     function createLiquidityPool() external onlyOwner {
-        if (isEnded() && isPoolCreated || isTerminated) revert PoolCreationDisallowed();
+        if (!isEnded() || isPoolCreated || isTerminated) revert PoolCreationDisallowed();
 
         isPoolCreated = true;
 
-        uint256 cachedTotalSupplyPresale = totalSupplyPresale;
-        uint256 totalFundsRaised = cachedTotalSupplyPresale * presalePrice;
+        uint256 totalFundsRaised = totalSupplyPresale * presalePrice;
 
-        uint256 fundsReservedForPlatform = totalFundsRaised * PresaleFactory(presaleFactory).protocolFee() / 10_000;
+        uint256 fundsReservedForPlatform = totalFundsRaised * PresalePlatform(presalePlatform).protocolFee() / 10_000;
         totalFundsRaised -= fundsReservedForPlatform;
 
         address pair = IUniswapV2Factory(UNISWAP_FACTORY_ADDRESS).createPair(WETH_ADDRESS, address(this));
@@ -185,7 +185,8 @@ contract Presale is Ownable, ERC20 {
         _mint(pair, totalFundsRaised / (presalePrice * 2)); // mint two times less tokens, therefore doubling the price
         IUniswapV2Pair(pair).mint(owner());
 
-        (bool success,) = PresaleFactory(presaleFactory).protocolFeeAddress().call{value: fundsReservedForPlatform}("");
+        (bool success,) =
+            PresalePlatform(presalePlatform).protocolFeeAddress().call{value: fundsReservedForPlatform}("");
         if (!success) revert UnsuccessfulExternalCall();
 
         emit LiqidityPoolCreated(pair);

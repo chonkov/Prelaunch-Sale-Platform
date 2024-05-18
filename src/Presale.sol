@@ -139,7 +139,7 @@ contract Presale is Ownable, ERC20 {
     }
 
     function redeem() external {
-        if (!isClaimable() || isTerminated || isPoolCreated) revert();
+        if (!isClaimable() || isPoolCreated) revert();
 
         uint256 amount = claimableAmounts[msg.sender];
         uint256 value = amount * presalePrice;

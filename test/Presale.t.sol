@@ -247,4 +247,109 @@ contract PresaleTest is Test {
         vm.expectRevert(Presale.InvalidAmount.selector);
         presale.claimTokens(1);
     }
+
+    function testRedeem() public {
+        uint256 amount = 100;
+        vm.warp(2);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.warp(102 + 14 days);
+
+        assertEq(presale.claimableAmounts(user1), 100);
+        assertEq(user1.balance, 90e18);
+
+        vm.prank(user1);
+        presale.redeem();
+
+        assertEq(presale.claimableAmounts(user1), 0);
+        assertEq(user1.balance, 100e18);
+    }
+
+    function testRedeemFail() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        presale.redeem();
+
+        vm.warp(102 + 14 days);
+
+        bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(user1);
+        vm.expectRevert();
+        presale.redeem();
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 ^ bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.expectRevert(Presale.UnsuccessfulExternalCall.selector);
+        presale.redeem();
+    }
+
+    function testEndPresalePrematurely() public {
+        uint256 amount = 1_000;
+        vm.warp(2);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.prank(owner);
+        vm.expectRevert();
+        presale.terminatePresale();
+
+        vm.prank(owner);
+        presale.endPresalePrematurely();
+
+        vm.prank(owner);
+        presale.terminatePresale();
+    }
+
+    function testEndPresalePrematurelyFail() public {
+        uint256 amount = 999;
+        vm.warp(2);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.prank(owner);
+        vm.expectRevert();
+        presale.endPresalePrematurely();
+    }
+
+    function testSetWebsiteURL() public {
+        vm.prank(owner);
+        presale.setWebsiteURL("");
+    }
+
+    function testSetWebsiteURLFail() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        presale.setWebsiteURL("");
+    }
+
+    function testSetDocsURL() public {
+        vm.prank(owner);
+        presale.setDocsURL("");
+    }
+
+    function testSetDocsURLFail() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        presale.setDocsURL("");
+    }
+
+    function testSetPresaleInfoURL() public {
+        vm.prank(owner);
+        presale.setPresaleInfoURL("");
+    }
+
+    function testSetPresaleInfoURLFail() public {
+        vm.prank(user1);
+        vm.expectRevert();
+        presale.setPresaleInfoURL("");
+    }
 }

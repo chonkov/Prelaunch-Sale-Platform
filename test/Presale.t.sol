@@ -175,4 +175,76 @@ contract PresaleTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, amount * presalePrice * 2 - 1));
         presale.buyToken{value: amount * presalePrice * 2 - 1}(amount);
     }
+
+    function testClaimTokens() public {
+        uint256 amount = 100;
+        vm.warp(2);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        // We wait for one more day to pass, before we claim
+        vm.warp(102 + 14 days + 1 days);
+
+        vm.prank(user1);
+        vm.expectRevert(Presale.InvalidAmount.selector);
+        presale.claimTokens(11);
+
+        assertEq(presale.claimableAmounts(user1), 100);
+        assertEq(presale.claimedAmounts(user1), 0);
+        assertEq(presale.totalSupply(), 0);
+        assertEq(presale.balanceOf(user1), 0);
+
+        vm.prank(user1);
+        presale.claimTokens(10);
+
+        assertEq(presale.claimableAmounts(user1), 90);
+        assertEq(presale.claimedAmounts(user1), 10);
+        assertEq(presale.totalSupply(), 10);
+        assertEq(presale.balanceOf(user1), 10);
+    }
+
+    function testClaimTokensFail() public {
+        uint256 amount = 100;
+        vm.warp(2);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.prank(user1);
+        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        presale.claimTokens(0);
+
+        vm.warp(102 + 14 days);
+
+        bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(256));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(user1);
+        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        presale.claimTokens(0);
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 ^ bytes32(uint256(256));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(user1);
+        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        presale.claimTokens(0);
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.warp(102 + 14 days);
+
+        vm.prank(user1);
+        vm.expectRevert(Presale.InvalidAmount.selector);
+        presale.claimTokens(1);
+    }
 }

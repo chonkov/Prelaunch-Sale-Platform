@@ -26,6 +26,7 @@ contract Presale is Ownable, ERC20 {
     error InvalidAmount();
     error PoolCreationDisallowed();
     error PresaleHasNotEnded();
+    error AlreadyCreatedPool();
     error AlreadyTerminated();
     error UnsuccessfulExternalCall();
 
@@ -93,7 +94,8 @@ contract Presale is Ownable, ERC20 {
     }
 
     function endPresalePrematurely() external {
-        if (initSupply == 0) endTimestamp = uint64(block.timestamp);
+        if (initSupply != 0) revert();
+        endTimestamp = uint64(block.timestamp);
 
         emit PresaleEndedPrematurely(block.timestamp);
     }
@@ -110,7 +112,7 @@ contract Presale is Ownable, ERC20 {
     }
 
     function buyToken(uint256 _amount) external payable {
-        if (!isClaimable() || isTerminated) revert BuyingTokensDisallowed();
+        if (!isClaimable() || isTerminated || !isPoolCreated) revert BuyingTokensDisallowed();
 
         if (msg.value != _amount * presalePrice * 2) revert InvalidETHAmount(msg.value);
 
@@ -120,11 +122,10 @@ contract Presale is Ownable, ERC20 {
     }
 
     function claimTokens(uint256 _amount) external {
-        if (!isClaimable() || isTerminated) revert ClaimingTokensDisallowed();
+        if (!isClaimable() || isTerminated || !isPoolCreated) revert ClaimingTokensDisallowed();
 
         uint256 timeElapsed = block.timestamp - (endTimestamp + MAX_LIQUIDITY_PHASE_DURATION);
-        uint256 daysPassed = timeElapsed / 1 days;
-        uint256 claimableAmount = daysPassed * (claimableAmounts[msg.sender] + claimedAmounts[msg.sender])
+        uint256 claimableAmount = timeElapsed * (claimableAmounts[msg.sender] + claimedAmounts[msg.sender])
             / VESTING_PERIOD - claimedAmounts[msg.sender];
 
         if (_amount > claimableAmount) revert InvalidAmount();
@@ -138,7 +139,7 @@ contract Presale is Ownable, ERC20 {
     }
 
     function redeem() external {
-        if (!isClaimable() || !isTerminated) revert();
+        if (!isClaimable() || isTerminated || isPoolCreated) revert();
 
         uint256 amount = claimableAmounts[msg.sender];
         uint256 value = amount * presalePrice;
@@ -194,6 +195,7 @@ contract Presale is Ownable, ERC20 {
 
     function terminatePresale() external onlyOwner {
         if (!isEnded()) revert PresaleHasNotEnded();
+        if (isPoolCreated) revert AlreadyCreatedPool();
         if (isTerminated) revert AlreadyTerminated();
 
         isTerminated = true;

@@ -50,13 +50,15 @@ contract PresalePlatform is Ownable {
         uint256 _presalePrice,
         uint64 _startTimestamp,
         uint64 _presaleDuration
-    ) external {
+    ) external returns (Presale) {
         Presale presale = presaleFactory.createPresale(
             _owner, _presaleMetadata, _initSupply, _presalePrice, _startTimestamp, _presaleDuration
         );
         presaleStatus[presale] = PresaleStatus.Started;
 
         emit PresaleCreated(address(presale), msg.sender);
+
+        return presale;
     }
 
     function updatePresale(Presale _presale) external {

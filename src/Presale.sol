@@ -176,11 +176,9 @@ contract Presale is Ownable, ERC20 {
         totalFundsRaised -= fundsReservedForPlatform;
 
         address pair = IUniswapV2Factory(UNISWAP_FACTORY_ADDRESS).createPair(WETH_ADDRESS, address(this));
-        require(pair == IUniswapV2Factory(UNISWAP_FACTORY_ADDRESS).getPair(WETH_ADDRESS, address(this)));
 
         IWETH(WETH_ADDRESS).deposit{value: totalFundsRaised}();
         uint256 wethBalance = IWETH(WETH_ADDRESS).balanceOf(address(this));
-        require(wethBalance == totalFundsRaised);
 
         IWETH(WETH_ADDRESS).transfer(pair, wethBalance);
         _mint(pair, totalFundsRaised / (presalePrice * 2)); // mint two times less tokens, therefore doubling the price

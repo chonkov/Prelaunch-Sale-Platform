@@ -10,6 +10,10 @@ import {Presale, PresaleMetadata} from "../src/Presale.sol";
 contract MockPresalePlatform {
     uint32 public protocolFee = 1_000;
     address public protocolFeeAddress = msg.sender;
+
+    function setProtocolFeeAddress(address _protocolFeeAddress) external {
+        protocolFeeAddress = _protocolFeeAddress;
+    }
 }
 
 contract PresaleTest is Test {
@@ -57,7 +61,7 @@ contract PresaleTest is Test {
     }
 
     function testBuyPresaleToken() public {
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         uint256 amount = 100;
 
@@ -87,7 +91,7 @@ contract PresaleTest is Test {
         vm.expectRevert(Presale.BuyingPresaleTokensDisallowed.selector);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
 
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
         vm.prank(user1);
         vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, 10e18 + 1));
         presale.buyPresaleToken{value: amount * presalePrice + 1}(amount);
@@ -96,7 +100,7 @@ contract PresaleTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, 10e18 - 1));
         presale.buyPresaleToken{value: amount * presalePrice - 1}(amount);
 
-        vm.warp(102);
+        vm.warp(block.timestamp + 101);
 
         vm.prank(user1);
         vm.expectRevert(Presale.BuyingPresaleTokensDisallowed.selector);
@@ -116,7 +120,7 @@ contract PresaleTest is Test {
         assertEq(presale.balanceOf(user1), 0);
 
         uint256 amount = 100;
-        vm.warp(102 + 14 days);
+        vm.warp(block.timestamp + 101 + 14 days);
 
         vm.prank(user1);
         presale.buyToken{value: amount * presalePrice * 2}(amount);
@@ -128,14 +132,14 @@ contract PresaleTest is Test {
 
     function testBuyTokenFail() public {
         uint256 amount = 100;
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         // `isClaimable` - false
         vm.prank(user1);
         vm.expectRevert(Presale.BuyingTokensDisallowed.selector);
         presale.buyToken{value: amount * presalePrice * 2}(amount);
 
-        vm.warp(102 + 14 days);
+        vm.warp(block.timestamp + 101 + 14 days);
 
         assertEq(presale.isTerminated(), false);
 
@@ -178,7 +182,7 @@ contract PresaleTest is Test {
 
     function testClaimTokens() public {
         uint256 amount = 100;
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         vm.prank(user1);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
@@ -188,7 +192,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         // We wait for one more day to pass, before we claim
-        vm.warp(102 + 14 days + 1 days);
+        vm.warp(block.timestamp + 101 + 14 days + 1 days);
 
         vm.prank(user1);
         vm.expectRevert(Presale.InvalidAmount.selector);
@@ -210,7 +214,7 @@ contract PresaleTest is Test {
 
     function testClaimTokensFail() public {
         uint256 amount = 100;
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         vm.prank(user1);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
@@ -219,7 +223,7 @@ contract PresaleTest is Test {
         vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
         presale.claimTokens(0);
 
-        vm.warp(102 + 14 days);
+        vm.warp(block.timestamp + 101 + 14 days);
 
         bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
         slot15 = slot15 | bytes32(uint256(256));
@@ -241,8 +245,6 @@ contract PresaleTest is Test {
         slot15 = slot15 | bytes32(uint256(1));
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
-        vm.warp(102 + 14 days);
-
         vm.prank(user1);
         vm.expectRevert(Presale.InvalidAmount.selector);
         presale.claimTokens(1);
@@ -250,12 +252,15 @@ contract PresaleTest is Test {
 
     function testRedeem() public {
         uint256 amount = 100;
-        vm.warp(2);
+
+        platform.setProtocolFeeAddress(owner);
+
+        vm.warp(block.timestamp + 1);
 
         vm.prank(user1);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
 
-        vm.warp(102 + 14 days);
+        vm.warp(block.timestamp + 101 + 14 days);
 
         assertEq(presale.claimableAmounts(user1), 100);
         assertEq(user1.balance, 90e18);
@@ -272,7 +277,7 @@ contract PresaleTest is Test {
         vm.expectRevert();
         presale.redeem();
 
-        vm.warp(102 + 14 days);
+        vm.warp(block.timestamp + 101 + 14 days);
 
         bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
         slot15 = slot15 | bytes32(uint256(1));
@@ -286,13 +291,15 @@ contract PresaleTest is Test {
         slot15 = slot15 ^ bytes32(uint256(1));
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
+        platform.setProtocolFeeAddress(address(this));
+
         vm.expectRevert(Presale.UnsuccessfulExternalCall.selector);
         presale.redeem();
     }
 
     function testEndPresalePrematurely() public {
         uint256 amount = 1_000;
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         vm.prank(user1);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
@@ -310,7 +317,7 @@ contract PresaleTest is Test {
 
     function testEndPresalePrematurelyFail() public {
         uint256 amount = 999;
-        vm.warp(2);
+        vm.warp(block.timestamp + 1);
 
         vm.prank(user1);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
@@ -351,5 +358,128 @@ contract PresaleTest is Test {
         vm.prank(user1);
         vm.expectRevert();
         presale.setPresaleInfoURL("");
+    }
+
+    function testCreateLiquidityPool() public {
+        uint256 amount = 100;
+
+        platform.setProtocolFeeAddress(owner);
+
+        vm.warp(block.timestamp + 1);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.warp(block.timestamp + 101);
+
+        assertEq(presale.isPoolCreated(), false);
+
+        vm.prank(owner);
+        presale.createLiquidityPool();
+
+        assertEq(presale.isPoolCreated(), true);
+    }
+
+    function testCreateLiquidityPoolFail() public {
+        uint256 amount = 100;
+
+        vm.warp(block.timestamp + 1);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.expectRevert();
+        presale.createLiquidityPool();
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        presale.createLiquidityPool();
+
+        vm.warp(block.timestamp + 101);
+
+        bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        presale.createLiquidityPool();
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 ^ bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(256));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        presale.createLiquidityPool();
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 ^ bytes32(uint256(256));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        platform.setProtocolFeeAddress(address(this));
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.UnsuccessfulExternalCall.selector);
+        presale.createLiquidityPool();
+    }
+
+    function testTerminatePresale() public {
+        uint256 amount = 100;
+
+        vm.warp(block.timestamp + 1);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.warp(block.timestamp + 101);
+
+        assertEq(presale.isTerminated(), false);
+
+        vm.prank(owner);
+        presale.terminatePresale();
+
+        assertEq(presale.isTerminated(), true);
+    }
+
+    function testTerminatePresaleFail() public {
+        uint256 amount = 100;
+
+        vm.warp(block.timestamp + 1);
+
+        vm.prank(user1);
+        presale.buyPresaleToken{value: amount * presalePrice}(amount);
+
+        vm.expectRevert();
+        presale.terminatePresale();
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.PresaleHasNotEnded.selector);
+        presale.terminatePresale();
+
+        vm.warp(block.timestamp + 101);
+
+        bytes32 slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 | bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.AlreadyCreatedPool.selector);
+        presale.terminatePresale();
+
+        slot15 = vm.load(address(presale), bytes32(uint256(15)));
+        slot15 = slot15 ^ bytes32(uint256(1));
+        vm.store(address(presale), bytes32(uint256(15)), slot15);
+
+        vm.prank(owner);
+        presale.terminatePresale();
+
+        vm.prank(owner);
+        vm.expectRevert(Presale.AlreadyTerminated.selector);
+        presale.terminatePresale();
     }
 }

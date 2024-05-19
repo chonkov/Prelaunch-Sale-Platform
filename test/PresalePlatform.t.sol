@@ -82,11 +82,11 @@ contract PresalePlatformTest is Test {
         platform.updatePresale(presale);
         assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Started));
 
-        vm.warp(101);
+        vm.warp(block.timestamp + 100);
         platform.updatePresale(presale);
         assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Liquidity));
 
-        vm.warp(101 + 14 days);
+        vm.warp(block.timestamp + 100 + 14 days);
         platform.updatePresale(presale);
         assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Ended));
     }

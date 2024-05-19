@@ -6,6 +6,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {PresalePlatform} from "../src/PresalePlatform.sol";
 import {Presale, PresaleMetadata} from "../src/Presale.sol";
 import {PresaleFactory} from "../src/PresaleFactory.sol";
+import {IPresalePlatform} from "../src/interfaces/IPresalePlatform.sol";
 
 contract PresalePlatformTest is Test {
     PresalePlatform platform;
@@ -23,7 +24,7 @@ contract PresalePlatformTest is Test {
         platform.setProtocolFee(protocolFee);
 
         vm.prank(platformOwner);
-        vm.expectRevert(PresalePlatform.InvalidProtocolFee.selector);
+        vm.expectRevert(IPresalePlatform.InvalidProtocolFee.selector);
         platform.setProtocolFee(0);
     }
 
@@ -37,7 +38,7 @@ contract PresalePlatformTest is Test {
         platform.setProtocolFeeAddress(platformOwner);
 
         vm.prank(platformOwner);
-        vm.expectRevert(PresalePlatform.InvalidProtocolFeeAddress.selector);
+        vm.expectRevert(IPresalePlatform.InvalidProtocolFeeAddress.selector);
         platform.setProtocolFeeAddress(address(0));
     }
 
@@ -53,7 +54,7 @@ contract PresalePlatformTest is Test {
         platform.setPresaleFactory(factory);
 
         vm.prank(platformOwner);
-        vm.expectRevert(PresalePlatform.InvalidPresaleFactory.selector);
+        vm.expectRevert(IPresalePlatform.InvalidPresaleFactory.selector);
         platform.setPresaleFactory(PresaleFactory(address(0)));
     }
 
@@ -70,7 +71,7 @@ contract PresalePlatformTest is Test {
         vm.prank(user);
         Presale presale = platform.createPresale(user, presaleMetadata, 1_000, 1e18, uint64(block.timestamp), 100);
 
-        assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Started));
+        assertEq(uint256(platform.presaleStatus(presale)), uint256(IPresalePlatform.PresaleStatus.Started));
     }
 
     function testUpdatePresale() public {
@@ -80,14 +81,14 @@ contract PresalePlatformTest is Test {
         Presale presale = platform.createPresale(user, presaleMetadata, 1_000, 1e18, uint64(block.timestamp), 100);
 
         platform.updatePresale(presale);
-        assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Started));
+        assertEq(uint256(platform.presaleStatus(presale)), uint256(IPresalePlatform.PresaleStatus.Started));
 
         vm.warp(block.timestamp + 100);
         platform.updatePresale(presale);
-        assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Liquidity));
+        assertEq(uint256(platform.presaleStatus(presale)), uint256(IPresalePlatform.PresaleStatus.Liquidity));
 
         vm.warp(block.timestamp + 100 + 14 days);
         platform.updatePresale(presale);
-        assertEq(uint256(platform.presaleStatus(presale)), uint256(PresalePlatform.PresaleStatus.Ended));
+        assertEq(uint256(platform.presaleStatus(presale)), uint256(IPresalePlatform.PresaleStatus.Ended));
     }
 }

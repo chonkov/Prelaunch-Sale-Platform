@@ -4,29 +4,11 @@ pragma solidity 0.8.20;
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {PresaleFactory} from "./PresaleFactory.sol";
-import {Presale, PresaleMetadata} from "./Presale.sol";
+import {Presale} from "./Presale.sol";
+import {PresaleMetadata} from "./interfaces/IPresale.sol";
+import {IPresalePlatform} from "./interfaces/IPresalePlatform.sol";
 
-contract PresalePlatform is Ownable {
-    enum PresaleStatus {
-        NonExistent,
-        Started,
-        Liquidity,
-        Ended
-    }
-
-    // Errors
-    error InvalidProtocolFee();
-    error InvalidProtocolFeeAddress();
-    error InvalidPresaleFactory();
-
-    // Events
-    event ProtocolFeeSet(uint256 previousProtocolFee, uint256 newProtocolFee);
-    event ProtocolFeeAddressTransferred(address previousProtocolFeeAddress, address newProtocolFeeAddress);
-    event ProtocolFeeSet(PresaleFactory presaleFactory, PresaleFactory newPresaleFactory);
-    event PresaleCreated(address indexed presale, address indexed creator);
-    event PresaleEnded(address indexed presale);
-    event PresaleLiquidityPhase(address indexed presale);
-
+contract PresalePlatform is IPresalePlatform, Ownable {
     uint32 public protocolFee;
     address public protocolFeeAddress;
     PresaleFactory public presaleFactory;

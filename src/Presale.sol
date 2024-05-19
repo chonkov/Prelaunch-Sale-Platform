@@ -6,43 +6,10 @@ import {ERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol"
 
 import {IUniswapV2Factory, IUniswapV2Pair} from "./interfaces/IUniswapV2.sol";
 import {IWETH} from "./interfaces/IWETH.sol";
+import {IPresale, PresaleMetadata} from "./interfaces/IPresale.sol";
 import {PresalePlatform} from "./PresalePlatform.sol";
 
-struct PresaleMetadata {
-    string name;
-    string symbol;
-    bytes websiteURL;
-    bytes docsURL;
-    bytes presaleInfoURL;
-}
-
-contract Presale is Ownable, ERC20 {
-    // Errors
-    error InvalidETHAmount(uint256 amount);
-    error InvalidFunctionParameter();
-    error BuyingPresaleTokensDisallowed();
-    error BuyingTokensDisallowed();
-    error ClaimingTokensDisallowed();
-    error InvalidAmount();
-    error PoolCreationDisallowed();
-    error PresaleHasNotEnded();
-    error AlreadyCreatedPool();
-    error AlreadyTerminated();
-    error UnsuccessfulExternalCall();
-
-    // Events
-    event PresaleTokensBought(address indexed buyer, uint256 amount, uint256 value);
-    event TokensBought(address indexed buyer, uint256 amount, uint256 value);
-    event TokensCLaimed(address indexed claimer, uint256 amount);
-    event TokensRedeemed(address indexed redemmer, uint256 amount);
-    event InitSupplyIncreased(uint256 amount);
-    event WebsiteURLChanged(bytes websiteURL, bytes newWebsiteURL);
-    event DocsURLChanged(bytes docsURL, bytes newDocsURL);
-    event PresaleInfoURLChanged(bytes presaleInfoURL, bytes newPresaleInfoURL);
-    event PresaleEndedPrematurely(uint256 timestamp);
-    event LiqidityPoolCreated(address indexed pair);
-    event PresaleTerminated();
-
+contract Presale is IPresale, Ownable, ERC20 {
     uint256 public constant MAX_PRESALE_DURATION = 28 days;
     uint256 public constant MAX_LIQUIDITY_PHASE_DURATION = 14 days;
     uint256 public VESTING_PERIOD = 10 days;

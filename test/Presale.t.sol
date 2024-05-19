@@ -6,6 +6,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {PresaleFactory} from "../src/PresaleFactory.sol";
 import {PresalePlatform} from "../src/PresalePlatform.sol";
 import {Presale, PresaleMetadata} from "../src/Presale.sol";
+import {IPresale} from "../src/interfaces/IPresale.sol";
 
 contract MockPresalePlatform {
     uint32 public protocolFee = 1_000;
@@ -88,22 +89,22 @@ contract PresaleTest is Test {
         uint256 amount = 100;
 
         vm.prank(user1);
-        vm.expectRevert(Presale.BuyingPresaleTokensDisallowed.selector);
+        vm.expectRevert(IPresale.BuyingPresaleTokensDisallowed.selector);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
 
         vm.warp(block.timestamp + 1);
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, 10e18 + 1));
+        vm.expectRevert(abi.encodeWithSelector(IPresale.InvalidETHAmount.selector, 10e18 + 1));
         presale.buyPresaleToken{value: amount * presalePrice + 1}(amount);
 
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, 10e18 - 1));
+        vm.expectRevert(abi.encodeWithSelector(IPresale.InvalidETHAmount.selector, 10e18 - 1));
         presale.buyPresaleToken{value: amount * presalePrice - 1}(amount);
 
         vm.warp(block.timestamp + 101);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.BuyingPresaleTokensDisallowed.selector);
+        vm.expectRevert(IPresale.BuyingPresaleTokensDisallowed.selector);
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
     }
 
@@ -136,7 +137,7 @@ contract PresaleTest is Test {
 
         // `isClaimable` - false
         vm.prank(user1);
-        vm.expectRevert(Presale.BuyingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.BuyingTokensDisallowed.selector);
         presale.buyToken{value: amount * presalePrice * 2}(amount);
 
         vm.warp(block.timestamp + 101 + 14 days);
@@ -151,7 +152,7 @@ contract PresaleTest is Test {
         assertEq(presale.isTerminated(), true);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.BuyingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.BuyingTokensDisallowed.selector);
         presale.buyToken{value: amount * presalePrice * 2}(amount);
 
         // `isPoolCreated` - false
@@ -160,7 +161,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.BuyingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.BuyingTokensDisallowed.selector);
         presale.buyToken{value: amount * presalePrice * 2}(amount);
 
         // `isClaimable` - true
@@ -172,11 +173,11 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, amount * presalePrice * 2 + 1));
+        vm.expectRevert(abi.encodeWithSelector(IPresale.InvalidETHAmount.selector, amount * presalePrice * 2 + 1));
         presale.buyToken{value: amount * presalePrice * 2 + 1}(amount);
 
         vm.prank(user1);
-        vm.expectRevert(abi.encodeWithSelector(Presale.InvalidETHAmount.selector, amount * presalePrice * 2 - 1));
+        vm.expectRevert(abi.encodeWithSelector(IPresale.InvalidETHAmount.selector, amount * presalePrice * 2 - 1));
         presale.buyToken{value: amount * presalePrice * 2 - 1}(amount);
     }
 
@@ -195,7 +196,7 @@ contract PresaleTest is Test {
         vm.warp(block.timestamp + 101 + 14 days + 1 days);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidAmount.selector);
+        vm.expectRevert(IPresale.InvalidAmount.selector);
         presale.claimTokens(11);
 
         assertEq(presale.claimableAmounts(user1), 100);
@@ -220,7 +221,7 @@ contract PresaleTest is Test {
         presale.buyPresaleToken{value: amount * presalePrice}(amount);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.ClaimingTokensDisallowed.selector);
         presale.claimTokens(0);
 
         vm.warp(block.timestamp + 101 + 14 days);
@@ -230,7 +231,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.ClaimingTokensDisallowed.selector);
         presale.claimTokens(0);
 
         slot15 = vm.load(address(presale), bytes32(uint256(15)));
@@ -238,7 +239,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.ClaimingTokensDisallowed.selector);
+        vm.expectRevert(IPresale.ClaimingTokensDisallowed.selector);
         presale.claimTokens(0);
 
         slot15 = vm.load(address(presale), bytes32(uint256(15)));
@@ -246,7 +247,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(user1);
-        vm.expectRevert(Presale.InvalidAmount.selector);
+        vm.expectRevert(IPresale.InvalidAmount.selector);
         presale.claimTokens(1);
     }
 
@@ -293,7 +294,7 @@ contract PresaleTest is Test {
 
         platform.setProtocolFeeAddress(address(this));
 
-        vm.expectRevert(Presale.UnsuccessfulExternalCall.selector);
+        vm.expectRevert(IPresale.UnsuccessfulExternalCall.selector);
         presale.redeem();
     }
 
@@ -392,7 +393,7 @@ contract PresaleTest is Test {
         presale.createLiquidityPool();
 
         vm.prank(owner);
-        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        vm.expectRevert(IPresale.PoolCreationDisallowed.selector);
         presale.createLiquidityPool();
 
         vm.warp(block.timestamp + 101);
@@ -402,7 +403,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(owner);
-        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        vm.expectRevert(IPresale.PoolCreationDisallowed.selector);
         presale.createLiquidityPool();
 
         slot15 = vm.load(address(presale), bytes32(uint256(15)));
@@ -414,7 +415,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(owner);
-        vm.expectRevert(Presale.PoolCreationDisallowed.selector);
+        vm.expectRevert(IPresale.PoolCreationDisallowed.selector);
         presale.createLiquidityPool();
 
         slot15 = vm.load(address(presale), bytes32(uint256(15)));
@@ -424,7 +425,7 @@ contract PresaleTest is Test {
         platform.setProtocolFeeAddress(address(this));
 
         vm.prank(owner);
-        vm.expectRevert(Presale.UnsuccessfulExternalCall.selector);
+        vm.expectRevert(IPresale.UnsuccessfulExternalCall.selector);
         presale.createLiquidityPool();
     }
 
@@ -458,7 +459,7 @@ contract PresaleTest is Test {
         presale.terminatePresale();
 
         vm.prank(owner);
-        vm.expectRevert(Presale.PresaleHasNotEnded.selector);
+        vm.expectRevert(IPresale.PresaleHasNotEnded.selector);
         presale.terminatePresale();
 
         vm.warp(block.timestamp + 101);
@@ -468,7 +469,7 @@ contract PresaleTest is Test {
         vm.store(address(presale), bytes32(uint256(15)), slot15);
 
         vm.prank(owner);
-        vm.expectRevert(Presale.AlreadyCreatedPool.selector);
+        vm.expectRevert(IPresale.AlreadyCreatedPool.selector);
         presale.terminatePresale();
 
         slot15 = vm.load(address(presale), bytes32(uint256(15)));
@@ -479,7 +480,7 @@ contract PresaleTest is Test {
         presale.terminatePresale();
 
         vm.prank(owner);
-        vm.expectRevert(Presale.AlreadyTerminated.selector);
+        vm.expectRevert(IPresale.AlreadyTerminated.selector);
         presale.terminatePresale();
     }
 }

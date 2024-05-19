@@ -3,9 +3,11 @@ pragma solidity 0.8.20;
 
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
-import {Presale, PresaleMetadata} from "./Presale.sol";
+import {IPresaleFactory} from "./interfaces/IPresaleFactory.sol";
+import {PresaleMetadata} from "./interfaces/IPresale.sol";
+import {Presale} from "./Presale.sol";
 
-contract PresaleFactory is Ownable {
+contract PresaleFactory is IPresaleFactory, Ownable {
     constructor() Ownable(msg.sender) {}
 
     function createPresale(
